@@ -16,7 +16,7 @@
                 if (ws) {
                     return false;
                 }
-                ws = new WebSocket("http://localhost/ws");
+                ws = new WebSocket("ws://127.0.0.1/ws");
                 ws.onopen = function(evt) {
                     print("OPEN");
                 }
