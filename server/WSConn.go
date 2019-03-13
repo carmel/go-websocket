@@ -35,6 +35,10 @@ type Message struct {
 	Data []byte
 }
 
+func (c *WSConn) GetConnId() string {
+	return c.ws.RemoteAddr().String()
+}
+
 func (c *WSConn) WriteChan(msg Message) error {
 	select {
 	case c.outChan <- &msg:

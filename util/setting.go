@@ -7,7 +7,7 @@ import (
 	"github.com/go-ini/ini"
 )
 
-var Redis = &Redis{}
+var RedisCli = &Redis{}
 
 type Redis struct {
 	Host        string
@@ -26,9 +26,9 @@ func ConfigInit() {
 		log.Fatalf("ConfigInit fail to parse 'app.ini': %v", err)
 	}
 
-	mapTo("redis", Redis)
+	mapTo("redis", RedisCli)
 
-	Redis.IdleTimeout = Redis.IdleTimeout * time.Second
+	RedisCli.IdleTimeout = RedisCli.IdleTimeout * time.Second
 }
 
 func mapTo(section string, v interface{}) {
