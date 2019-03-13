@@ -3,7 +3,7 @@ package util
 import (
 	"encoding/json"
 	"time"
-	setting "trainee/util"
+	setting "go-websocket/util"
 
 	"github.com/gomodule/redigo/redis"
 )
