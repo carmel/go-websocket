@@ -50,7 +50,7 @@ func Set(key string, data interface{}) (bool, error) {
 	return reply, err
 }
 
-func Set(key string, data interface{}, time int) (bool, error) {
+func Lpush(key string, data interface{}) (bool, error) {
 	conn := RedisConn.Get()
 	defer conn.Close()
 
@@ -64,6 +64,8 @@ func Set(key string, data interface{}, time int) (bool, error) {
 
 	return reply, err
 }
+
+func 
 
 func Exists(key string) bool {
 	conn := RedisConn.Get()

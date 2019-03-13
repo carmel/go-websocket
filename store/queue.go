@@ -11,5 +11,5 @@ type Queue interface {
 type RedisQueue struct{}
 
 func (q RedisQueue) Offer(e interface{}) {
-
+	Set()
 }
