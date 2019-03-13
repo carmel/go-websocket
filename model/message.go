@@ -1,4 +1,4 @@
-package entity
+package model
 
 import (
 	"encoding/json"
@@ -19,13 +19,13 @@ type Message struct {
 func (m *Message) Push() {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	Lpush(constant.QUEUE, m)
+	util.Lpush(constant.QUEUE, m)
 }
 
 // 出队-返回队尾元素
 func (m *Message) Pop() {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	util.CheckErr(`json Unmarshal fail`, json.Unmarshal(Rpop(constant.QUEUE), m))
+	util.CheckErr(`json Unmarshal fail`, json.Unmarshal(util.Rpop(constant.QUEUE), m))
 	return
 }
