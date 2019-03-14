@@ -9,8 +9,6 @@ import (
 // 消息体-一个话题对应一个消息队列
 type Message struct {
 	// mutex     sync.Mutex // 互斥锁
-	MsgType   int    // 消息类型
-	ConnId    string // 客户端连接id
 	Text      string // 消息内容
 	SubjectId string // 话题id
 	CurTime   int64  // 发送时间

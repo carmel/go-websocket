@@ -70,12 +70,12 @@ func Exists(key string) bool {
 	return exists
 }
 
-func CountKeys(pattern string) int {
+func Keys(pattern string) []interface{} {
 	conn := RedisConn.Get()
 	defer conn.Close()
 	reply, err := redis.Values(conn.Do("keys", pattern+"*"))
 	CheckErr(`redis KEYS error`, err)
-	return len(reply)
+	return reply
 }
 
 func Delete(key string) (bool, error) {
@@ -94,8 +94,8 @@ func Lpush(key string, data interface{}) {
 
 	reply, err := redis.Bool(conn.Do("LPUSH", key, value))
 	CheckErr(`redis LPUSH error`, err)
-	if reply {
-		Log(`push success`)
+	if !reply {
+		Log(`LPUSH failed`)
 	}
 }
 
@@ -117,8 +117,8 @@ func Sadd(key string, data interface{}) {
 
 	replay, err := redis.Bool(conn.Do("SADD", key, value))
 	CheckErr(`redis SADD error`, err)
-	if replay {
-		Log(`add success`)
+	if !replay {
+		Log(`SADD failed`)
 	}
 }
 func Srem(key string, member string) {
@@ -127,7 +127,39 @@ func Srem(key string, member string) {
 
 	replay, err := redis.Bool(conn.Do("SREM", key, member))
 	CheckErr(`redis SREM error`, err)
-	if replay {
-		Log(`remove success`)
+	if !replay {
+		Log(`SREM failed`)
 	}
+}
+
+func Scard(k string) []interface{} {
+	conn := RedisConn.Get()
+	defer conn.Close()
+
+	reply, err := redis.Values(conn.Do("SCARD", k))
+	CheckErr(`redis RPOP error`, err)
+	return reply
+}
+
+func Hset(k string, f string, data interface{}) {
+	conn := RedisConn.Get()
+	defer conn.Close()
+
+	v, err := json.Marshal(data)
+	CheckErr(`data marshal error`, err)
+
+	replay, err := redis.Bool(conn.Do("HSET", k, f, v))
+	CheckErr(`redis HSET error`, err)
+	if !replay {
+		Log(`HSET failed`)
+	}
+}
+
+func Hget(k string, f string) []byte {
+	conn := RedisConn.Get()
+	defer conn.Close()
+
+	reply, err := redis.Bytes(conn.Do("HGET", k, f))
+	CheckErr(`redis HGET error`, err)
+	return reply
 }

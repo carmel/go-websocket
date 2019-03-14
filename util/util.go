@@ -8,6 +8,6 @@ func CheckErr(tip string, err error) {
 	}
 }
 
-func Log(info string) {
-	log.Println(info)
+func Log(v ...interface{}) {
+	log.Println(v...)
 }

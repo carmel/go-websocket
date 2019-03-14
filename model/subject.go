@@ -2,7 +2,6 @@ package model
 
 import (
 	"go-websocket/constant"
-	"go-websocket/server"
 	"go-websocket/util"
 	"sync"
 
@@ -17,13 +16,18 @@ type Subject struct {
 }
 
 // 订阅
-func (s *Subject) Subscribe(c *server.WSConn) {
-	util.Sadd(s.Id, c.GetConnId())
+func (s *Subject) Subscribe(connid string) {
+	util.Sadd(constant.SUBJECT_PREFIX+s.Id, connid)
 }
 
 // 取消订阅
-func (s *Subject) Unsubscribe(c *server.WSConn) {
-	util.Srem(s.Id, c.GetConnId())
+func (s *Subject) Unsubscribe(connid string) {
+	util.Srem(constant.SUBJECT_PREFIX+s.Id, connid)
+}
+
+// 列出所有订阅者
+func (s *Subject) ListSubscriber() []interface{} {
+	return util.Scard(constant.SUBJECT_PREFIX + s.Id)
 }
 
 // 创建新话题
@@ -37,11 +41,4 @@ func (s *Subject) Create() {
 	if !util.Exists(key) {
 		util.Set(key, s)
 	}
-}
-
-// 话题总数
-func (s *Subject) Count() int {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-	return util.CountKeys(constant.SUBJECT_PREFIX + s.Id)
 }

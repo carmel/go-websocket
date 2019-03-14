@@ -3,10 +3,10 @@ package server
 import (
 	"encoding/json"
 	"errors"
-	"flag"
+
+	"go-websocket/constant"
 	"go-websocket/model"
 	"go-websocket/util"
-	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -23,35 +23,34 @@ var upgrader = websocket.Upgrader{
 }
 
 type WSConn struct {
-	ws      *websocket.Conn     // 底层websocket
-	inChan  chan *model.Message // 读队列
-	outChan chan *model.Message // 写队列
+	ws       *websocket.Conn    // 底层websocket
+	readBuf  chan model.Message // 读缓存
+	writeBuf chan model.Message // 写缓存
 
 	mutex     sync.Mutex // 避免重复关闭管道
 	isClosed  bool
 	closeChan chan byte // 关闭通知
 }
 
-func (c *WSConn) GetConnId() string {
-	return c.ws.RemoteAddr().String()
-}
-
 func (c *WSConn) WriteChan(msg model.Message) error {
 	select {
-	case c.outChan <- &msg:
+	case c.writeBuf <- msg:
 	case <-c.closeChan:
 		return errors.New("websocket closed")
 	}
 	return nil
 }
 
+// 信息暂存
 func (c *WSConn) ReadChan() (*model.Message, error) {
 	select {
-	case msg := <-c.inChan:
-		return msg, nil
+	case msg := <-c.readBuf:
+		// 临时存到redis中
+		util.Lpush(constant.QUEUE_PREFIX+msg.SubjectId, msg)
+		return &msg, nil
 	case <-c.closeChan:
+		return nil, errors.New("websocket closed")
 	}
-	return nil, errors.New("websocket closed")
 }
 
 func (c *WSConn) Close() {
@@ -68,8 +67,8 @@ func (c *WSConn) heartbeat(sec time.Duration) {
 	go func() {
 		for {
 			time.Sleep(sec * time.Second)
-			if err := c.WriteChan(model.Message{websocket.PingMessage, []byte("Ping from server")}); err != nil {
-				log.Println(`heartbeat fail`)
+			if err := c.ws.WriteMessage(websocket.PingMessage, nil); err != nil {
+				util.Log(`heartbeat fail`)
 				c.Close()
 				break
 			}
@@ -82,13 +81,15 @@ func Handler(resp http.ResponseWriter, req *http.Request) {
 	// 应答客户端告知升级连接为websocket
 	ws, err := upgrader.Upgrade(resp, req, nil)
 	if err != nil {
-		log.Println(`Fail to convert protocol: `, err)
+		util.Log(`Fail to convert protocol: `, err)
 		return
 	}
+
+	util.Hset(constant.WEBSOCKET, ws.RemoteAddr().String(), ws)
 	c := &WSConn{
 		ws:        ws,
-		inChan:    make(chan *model.Message, 1000),
-		outChan:   make(chan *model.Message, 1000),
+		readBuf:   make(chan model.Message, 1000),
+		writeBuf:  make(chan model.Message, 1000),
 		closeChan: make(chan byte),
 		isClosed:  false,
 	}
@@ -98,64 +99,78 @@ func Handler(resp http.ResponseWriter, req *http.Request) {
 	// 这是一个同步处理模型（只是一个例子），如果希望并行处理可以每个请求一个gorutine，注意控制并发goroutine的数量!!!
 	go func() {
 		for {
-			msg, err := c.ReadChan()
-			if err != nil {
-				log.Println("read fail")
+			if msg, err := c.ReadChan(); err != nil {
+				util.Log(`ReadChan error, `, err)
 				break
-			}
-			err = c.WriteChan(*msg)
-			if err != nil {
-				log.Println("write fail")
-				break
+			} else {
+				if err = c.WriteChan(*msg); err != nil {
+					util.Log(`WriteChan error, `, err)
+					break
+				}
 			}
 		}
 	}()
 
 	// 读协程
 	go func() {
+	LOOP:
 		for {
 			// 读一个message
-			msgType, data, err := c.ws.ReadMessage()
-			if err != nil {
-				log.Println(`Message Read Error: `, err)
-			}
-			var d map[string]interface{}
-			util.CheckErr(`json Unmarshal fail`, json.Unmarshal(data, d))
-
-			req := &model.Message{
-				msgType,
-				c.GetConnId(),
-				d["text"].(string),
-				d["subject"].(string),
-				time.Now().Unix(),
-			}
-			// 放入请求队列
-			select {
-			case c.inChan <- req:
-			case <-c.closeChan:
+			if _, data, err := c.ws.ReadMessage(); err != nil {
+				util.Log(`Message read error, `, err)
 				c.Close()
+				break
+			} else {
+				var d map[string]interface{}
+				if err := json.Unmarshal(data, &d); err != nil {
+					util.Log(`Incorrect json format`, err)
+					continue
+				}
+				if d != nil {
+					req := model.Message{
+						Text:      d["text"].(string),
+						SubjectId: d["subject"].(string),
+						CurTime:   time.Now().Unix(),
+					}
+					// 放入请求队列
+					select {
+					case c.readBuf <- req:
+					case <-c.closeChan:
+						break LOOP
+					}
+				}
 			}
 		}
 	}()
 	// 写协程
 	go func() {
 		for {
-			select {
-			// 取一个应答
-			case msg := <-c.outChan:
-				// 写给websocket
-				if err := c.ws.WriteMessage(msg.Type, msg.Data); err != nil {
-					log.Println(`Message Write Error: `, err)
+			// util.Rpop(constant.QUEUE_PREFIX+msg.SubjectId)
+			s := util.Keys(constant.SUBJECT_PREFIX)
+			for _, v := range s { // 遍历话题
+				q := util.Rpop(v.(string))
+				for q != nil { // 遍历消息
+					// 写给websocket
+					// 从redis取一个应答
+					var m model.Message
+					if err := json.Unmarshal(q, &m); err != nil {
+						util.Log(`Incorrect json format`, err)
+					}
+					subject := &model.Subject{Id: m.SubjectId}
+					for _, ss := range subject.ListSubscriber() {
+						ws := util.Hget(constant.WEBSOCKET, ss.(string))
+
+						var w *websocket.Conn
+						if err := json.Unmarshal(ws, &w); err != nil {
+							util.Log(`Incorrect json format`, err)
+						} else {
+							if err := w.WriteMessage(websocket.TextMessage, []byte(m.Text)); err != nil {
+								util.Log(`Message write error, `, err)
+							}
+						}
+					}
 				}
-			case <-c.closeChan:
-				c.Close()
 			}
 		}
 	}()
-}
-func main() {
-	p := flag.String("p", "7777", "http listen port")
-	flag.Parse()
-	http.HandleFunc("/ws", Handler)
-	http.ListenAndServe("0.0.0.0:"+*p, nil)
 }
