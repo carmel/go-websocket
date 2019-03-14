@@ -1,6 +1,6 @@
 package constant
 
 var (
-	QUEUE          = `REDIS_QUEUE`
+	QUEUE_PREFIX          = `QUEUE_`
 	SUBJECT_PREFIX = `SUBJECT_`
 )

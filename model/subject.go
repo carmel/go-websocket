@@ -5,6 +5,8 @@ import (
 	"go-websocket/server"
 	"go-websocket/util"
 	"sync"
+
+	uuid "github.com/satori/go.uuid"
 )
 
 // 话题
@@ -26,6 +28,9 @@ func (s *Subject) Unsubscribe(c *server.WSConn) {
 
 // 创建新话题
 func (s *Subject) Create() {
+	if s.Id == "" {
+		s.Id = uuid.Must(uuid.NewV1()).String()
+	}
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	key := constant.SUBJECT_PREFIX + s.Id

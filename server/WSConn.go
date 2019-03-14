@@ -1,8 +1,11 @@
 package server
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
+	"go-websocket/model"
+	"go-websocket/util"
 	"log"
 	"net/http"
 	"sync"
@@ -20,26 +23,20 @@ var upgrader = websocket.Upgrader{
 }
 
 type WSConn struct {
-	ws      *websocket.Conn // 底层websocket
-	inChan  chan *Message   // 读队列
-	outChan chan *Message   // 写队列
+	ws      *websocket.Conn     // 底层websocket
+	inChan  chan *model.Message // 读队列
+	outChan chan *model.Message // 写队列
 
 	mutex     sync.Mutex // 避免重复关闭管道
 	isClosed  bool
 	closeChan chan byte // 关闭通知
 }
 
-// websocket的Message对象
-type Message struct {
-	Type int
-	Data []byte
-}
-
 func (c *WSConn) GetConnId() string {
 	return c.ws.RemoteAddr().String()
 }
 
-func (c *WSConn) WriteChan(msg Message) error {
+func (c *WSConn) WriteChan(msg model.Message) error {
 	select {
 	case c.outChan <- &msg:
 	case <-c.closeChan:
@@ -48,7 +45,7 @@ func (c *WSConn) WriteChan(msg Message) error {
 	return nil
 }
 
-func (c *WSConn) ReadChan() (*Message, error) {
+func (c *WSConn) ReadChan() (*model.Message, error) {
 	select {
 	case msg := <-c.inChan:
 		return msg, nil
@@ -71,7 +68,7 @@ func (c *WSConn) heartbeat(sec time.Duration) {
 	go func() {
 		for {
 			time.Sleep(sec * time.Second)
-			if err := c.WriteChan(Message{websocket.PingMessage, []byte("Ping from server")}); err != nil {
+			if err := c.WriteChan(model.Message{websocket.PingMessage, []byte("Ping from server")}); err != nil {
 				log.Println(`heartbeat fail`)
 				c.Close()
 				break
@@ -90,8 +87,8 @@ func Handler(resp http.ResponseWriter, req *http.Request) {
 	}
 	c := &WSConn{
 		ws:        ws,
-		inChan:    make(chan *Message, 1000),
-		outChan:   make(chan *Message, 1000),
+		inChan:    make(chan *model.Message, 1000),
+		outChan:   make(chan *model.Message, 1000),
 		closeChan: make(chan byte),
 		isClosed:  false,
 	}
@@ -122,9 +119,15 @@ func Handler(resp http.ResponseWriter, req *http.Request) {
 			if err != nil {
 				log.Println(`Message Read Error: `, err)
 			}
-			req := &Message{
+			var d map[string]interface{}
+			util.CheckErr(`json Unmarshal fail`, json.Unmarshal(data, d))
+
+			req := &model.Message{
 				msgType,
-				data,
+				c.GetConnId(),
+				d["text"].(string),
+				d["subject"].(string),
+				time.Now().Unix(),
 			}
 			// 放入请求队列
 			select {
