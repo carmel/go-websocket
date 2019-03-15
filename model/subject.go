@@ -4,8 +4,6 @@ import (
 	"go-websocket/constant"
 	"go-websocket/util"
 	"sync"
-
-	uuid "github.com/satori/go.uuid"
 )
 
 // 话题
@@ -16,25 +14,24 @@ type Subject struct {
 }
 
 // 订阅
-func (s *Subject) Subscribe(connid string) {
-	util.Sadd(constant.SUBJECT_PREFIX+s.Id, connid)
+func (s *Subject) Subscribe(addr string) {
+	util.Sadd(constant.SUBSCRIBER_PREFIX+s.Id, addr)
 }
 
 // 取消订阅
-func (s *Subject) Unsubscribe(connid string) {
-	util.Srem(constant.SUBJECT_PREFIX+s.Id, connid)
+func (s *Subject) Unsubscribe(addr string) {
+	util.Srem(constant.SUBSCRIBER_PREFIX+s.Id, addr)
 }
 
 // 列出所有订阅者
-func (s *Subject) ListSubscriber() []interface{} {
-	return util.Scard(constant.SUBJECT_PREFIX + s.Id)
+func ListSubscriber(subjectid string) []interface{} {
+	return util.Smembers(constant.SUBSCRIBER_PREFIX + subjectid)
 }
 
 // 创建新话题
-func (s *Subject) Create() {
-	if s.Id == "" {
-		s.Id = uuid.Must(uuid.NewV1()).String()
-	}
+func (s *Subject) Create(name string) {
+	s.Id = util.UUID()
+	s.Name = name
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	key := constant.SUBJECT_PREFIX + s.Id

@@ -36,6 +36,16 @@ func RedisInit() error {
 	return nil
 }
 
+func Transaction(f func()) {
+	conn := RedisConn.Get()
+	defer conn.Close()
+
+	conn.Send("MULTI")
+	f()
+	_, err := conn.Do("EXEC")
+	CheckErr(`data marshal error`, err)
+}
+
 func Set(key string, data interface{}) {
 	conn := RedisConn.Get()
 	defer conn.Close()
@@ -43,10 +53,10 @@ func Set(key string, data interface{}) {
 	value, err := json.Marshal(data)
 	CheckErr(`data marshal error`, err)
 
-	replay, err := redis.Bool(conn.Do("SET", key, value))
+	reply, err := redis.String(conn.Do("SET", key, value))
 	CheckErr(`redis SET error`, err)
-	if replay {
-		Log(`set success`)
+	if reply != "OK" {
+		Log(`SET failed`)
 	}
 }
 
@@ -103,17 +113,17 @@ func Rpop(key string) []byte {
 	conn := RedisConn.Get()
 	defer conn.Close()
 
-	reply, err := redis.Bytes(conn.Do("RPOP", key))
-	CheckErr(`redis RPOP error`, err)
-	return reply
+	if reply, err := redis.Bytes(conn.Do("RPOP", key)); err != nil && reply == nil {
+		Log(`redis QUEUE is nil`)
+	} else {
+		return reply
+	}
+	return nil
 }
 
-func Sadd(key string, data interface{}) {
+func Sadd(key, value string) {
 	conn := RedisConn.Get()
 	defer conn.Close()
-
-	value, err := json.Marshal(data)
-	CheckErr(`data marshal error`, err)
 
 	replay, err := redis.Bool(conn.Do("SADD", key, value))
 	CheckErr(`redis SADD error`, err)
@@ -132,12 +142,12 @@ func Srem(key string, member string) {
 	}
 }
 
-func Scard(k string) []interface{} {
+func Smembers(k string) []interface{} {
 	conn := RedisConn.Get()
 	defer conn.Close()
 
-	reply, err := redis.Values(conn.Do("SCARD", k))
-	CheckErr(`redis RPOP error`, err)
+	reply, err := redis.Values(conn.Do("SMEMBERS", k))
+	CheckErr(`redis SMEMBERS error`, err)
 	return reply
 }
 
@@ -148,9 +158,9 @@ func Hset(k string, f string, data interface{}) {
 	v, err := json.Marshal(data)
 	CheckErr(`data marshal error`, err)
 
-	replay, err := redis.Bool(conn.Do("HSET", k, f, v))
+	reply, err := redis.Bool(conn.Do("HSET", k, f, v))
 	CheckErr(`redis HSET error`, err)
-	if !replay {
+	if !reply {
 		Log(`HSET failed`)
 	}
 }
@@ -162,4 +172,15 @@ func Hget(k string, f string) []byte {
 	reply, err := redis.Bytes(conn.Do("HGET", k, f))
 	CheckErr(`redis HGET error`, err)
 	return reply
+}
+
+func Hdel(k string, f string) {
+	conn := RedisConn.Get()
+	defer conn.Close()
+
+	reply, err := redis.Bool(conn.Do("HDEL", k, f))
+	CheckErr(`redis HDEL error`, err)
+	if !reply {
+		Log(`HDEL failed`)
+	}
 }

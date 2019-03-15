@@ -1,6 +1,10 @@
 package util
 
-import "log"
+import (
+	"log"
+
+	uuid "github.com/satori/go.uuid"
+)
 
 func CheckErr(tip string, err error) {
 	if err != nil {
@@ -10,4 +14,8 @@ func CheckErr(tip string, err error) {
 
 func Log(v ...interface{}) {
 	log.Println(v...)
+}
+
+func UUID() string {
+	return uuid.Must(uuid.NewV1()).String()
 }

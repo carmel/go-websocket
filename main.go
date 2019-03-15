@@ -15,6 +15,8 @@ func init() {
 func main() {
 	p := flag.String("p", "7777", "http listen port")
 	flag.Parse()
-	http.HandleFunc("/ws", server.Handler)
+	hub := server.NewHub()
+	hub.Run()
+	http.HandleFunc("/ws", server.ServeWS(hub))
 	http.ListenAndServe("0.0.0.0:"+*p, nil)
 }

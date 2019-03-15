@@ -5,7 +5,9 @@
     <script>
         window.addEventListener("load", function(evt) {
             var output = document.getElementById("output");
-            var input = document.getElementById("input");
+            var typ = document.getElementById("typ");
+            var text = document.getElementById("text");
+            var subject = document.getElementById("subject");
             var ws;
             var print = function(message) {
                 var d = document.createElement("div");
@@ -26,10 +28,10 @@
                     ws = null;
                 }
                 ws.onmessage = function(evt) {
-                    print("RESPONSE: " + evt.data);
+                    print("接收: " + evt.data);
                 }
                 ws.onerror = function(evt) {
-                    print("ERROR: " + evt.data);
+                    print("出错: " + evt.data);
                 }
                 return false;
             };
@@ -37,9 +39,10 @@
                 if (!ws) {
                     return false;
                 }
-                print("SEND: " + input.value);
-                msg.subject = "1"
-                msg.text = input.value
+                print("发送: " + text.value);
+                msg.type = typ.value
+                msg.subject = subject.value
+                msg.text = text.value
                 ws.send(JSON.stringify(msg));
                 return false;
             };
@@ -56,15 +59,19 @@
 <body>
 <table>
     <tr><td valign="top" width="50%">
-        <p>Click "Open" to create a connection to the server,
-            "Send" to send a message to the server and "Close" to close the connection.
-            You can change the message and send multiple times.
+        <p><b>说明：</b></p>
+        <p>点击"Open"创建到服务器的websocket连接</p>
+        <p>点击"Send"发送消息(Type为1时创建话题，Text为话题名称；Type为0时订阅话题，Text无意义；Type为9时，正常发消息，Subject为话题id，Text为消息内容；否则退订) </p>
+        <p>点击"Close"关闭连接</p>
         </p>
             <form>
                 <button id="open">Open</button>
                 <button id="close">Close</button>
-            <input id="input" type="text" value="Hello world!">
-            <button id="send">Send</button>
+                <p> Type:<input id="typ" type="text" value="1"></p>
+                    <p> Text:<input id="text" type="text" value="Hello world!"></p>
+                        <p> Subject:<input id="subject" type="text" value=""></p>
+            <p><button id="send">Send</button></p>
+            
             </form>
     </td><td valign="top" width="50%">
         <div id="output"></div>
