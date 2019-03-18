@@ -4,7 +4,7 @@
 要求：简单实现一个分布式的基于websocket的消息推送系统（可使用第三方库），最好能备注设计和优化思路。
 
 
-该项目采用第三方websocket库为[gorilla/websocket](github.com/gorilla/websocket)，使用nginx进行负载均衡。设计思路如下：
+该项目采用第三方websocket库为[gorilla/websocket](http://github.com/gorilla/websocket)，使用nginx进行负载均衡。设计思路如下：
 * Client(浏览器)请求连接服务器时，会将连接信息注册到Hub中(关闭时会在Hub中注销)；
 * 收到message时，传输给Hub处理，临时存到redis中；
 * Hub通过遍历基于redis list实现的消息队列将message逐个转发给每个订阅过该message所属话题的Client
